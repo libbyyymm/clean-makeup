@@ -40,6 +40,13 @@
       margin: 14px 0 8px;
     }
 
+    .label-note {
+      font-weight: 400;
+      color: #666;
+      font-size: 14px;
+      margin-left: 6px;
+    }
+
     input, textarea {
       width: 100%;
       padding: 12px;
@@ -88,6 +95,10 @@
       background: #dc2626;
     }
 
+    button.success {
+      background: #059669;
+    }
+
     button:disabled {
       opacity: 0.7;
       cursor: wait;
@@ -133,6 +144,15 @@
       margin-top: 12px;
       font-size: 14px;
       color: #444;
+    }
+
+    .save-row {
+      margin-top: 14px;
+      display: none;
+    }
+
+    .save-row.show {
+      display: block;
     }
 
     .history {
@@ -269,12 +289,16 @@
       Paste a skincare, makeup, or cosmetic ingredient list to check for potentially pore-clogging ingredients.
     </p>
 
-    <label for="productNameInput">Product Name</label>
+    <label for="productNameInput">
+      Product Name <span class="label-note">(optional for saving)</span>
+    </label>
     <input id="productNameInput" type="text" placeholder="Example: Hydrating Cleanser" />
 
     <div class="url-row">
       <div class="field">
-        <label for="productUrlInput">Product URL</label>
+        <label for="productUrlInput">
+          Product URL <span class="label-note">(optional for saving)</span>
+        </label>
         <input id="productUrlInput" type="url" placeholder="https://example.com/product-page" />
       </div>
       <div>
@@ -293,7 +317,9 @@
       </div>
     </div>
 
-    <label for="imageUrlInput">Product Image URL</label>
+    <label for="imageUrlInput">
+      Product Image URL <span class="label-note">(optional for saving)</span>
+    </label>
     <input id="imageUrlInput" type="url" placeholder="https://example.com/product-image.jpg" />
 
     <label for="ingredientsInput">Ingredients</label>
@@ -309,6 +335,10 @@
     </div>
 
     <section id="results" class="results"></section>
+
+    <div id="saveRow" class="save-row">
+      <button id="saveBtn" type="button" class="success">Save Result</button>
+    </div>
 
     <section class="history">
       <div class="history-header">
@@ -438,6 +468,8 @@
     const fillFromUrlBtn = document.getElementById("fillFromUrlBtn");
     const checkBtn = document.getElementById("checkBtn");
     const clearBtn = document.getElementById("clearBtn");
+    const saveBtn = document.getElementById("saveBtn");
+    const saveRow = document.getElementById("saveRow");
     const clearHistoryBtn = document.getElementById("clearHistoryBtn");
     const results = document.getElementById("results");
     const historyList = document.getElementById("historyList");
@@ -446,6 +478,8 @@
     const previewWrap = document.getElementById("previewWrap");
     const previewImage = document.getElementById("previewImage");
     const previewText = document.getElementById("previewText");
+
+    let lastCheckedMatches = null;
 
     function normalizeText(text) {
       return text
@@ -659,7 +693,9 @@
       });
     }
 
-    function saveCurrentResult(matches) {
+    function saveCurrentResult() {
+      if (!lastCheckedMatches) return;
+
       const items = getHistory();
 
       items.unshift({
@@ -667,23 +703,32 @@
         productUrl: productUrlInput.value.trim(),
         imageUrl: imageUrlInput.value.trim(),
         ingredientsText: ingredientsInput.value.trim(),
-        matches: matches,
+        matches: lastCheckedMatches,
         checkedAt: new Date().toISOString()
       });
 
       saveHistory(items);
       renderHistory();
+      saveRow.className = "save-row";
+      saveBtn.textContent = "Saved";
+      setTimeout(function() {
+        saveBtn.textContent = "Save Result";
+      }, 1000);
     }
 
     function setUrlStatus(message) {
       urlStatus.textContent = message || "";
     }
 
+    function clearPreview() {
+      previewWrap.className = "preview-wrap";
+      previewImage.removeAttribute("src");
+      previewText.textContent = "";
+    }
+
     function showPreview(title, imageUrl) {
       if (!imageUrl) {
-        previewWrap.className = "preview-wrap";
-        previewImage.removeAttribute("src");
-        previewText.textContent = "";
+        clearPreview();
         return;
       }
 
@@ -697,11 +742,13 @@
 
       if (!url) {
         setUrlStatus("Paste a product URL first.");
+        clearPreview();
         return;
       }
 
       fillFromUrlBtn.disabled = true;
       setUrlStatus("Trying to load product info from URL...");
+      clearPreview();
 
       try {
         const endpoint = "https://api.microlink.io/?url=" + encodeURIComponent(url);
@@ -718,12 +765,8 @@
         }
 
         const meta = data.data;
-
         const detectedTitle = meta.title || "";
-        const detectedImage =
-          (meta.image && meta.image.url) ||
-          (meta.logo && meta.logo.url) ||
-          "";
+        const detectedImage = (meta.image && meta.image.url) ? meta.image.url : "";
 
         let filledAnything = false;
 
@@ -732,22 +775,26 @@
           filledAnything = true;
         }
 
-        if (detectedImage && !imageUrlInput.value.trim()) {
+        if (detectedImage) {
           imageUrlInput.value = detectedImage;
           filledAnything = true;
+          showPreview(detectedTitle, detectedImage);
+        } else {
+          imageUrlInput.value = "";
+          clearPreview();
         }
-
-        showPreview(detectedTitle, detectedImage);
 
         if (filledAnything) {
           setUrlStatus("Loaded product info from the URL.");
         } else if (detectedTitle || detectedImage) {
           setUrlStatus("Metadata found. Existing fields were left unchanged.");
         } else {
-          setUrlStatus("Could not find a title or image for that URL.");
+          setUrlStatus("Could not find a useful title or image for that URL.");
         }
       } catch (error) {
         setUrlStatus("Could not load product info from that URL. You can still fill it in manually.");
+        imageUrlInput.value = "";
+        clearPreview();
       } finally {
         fillFromUrlBtn.disabled = false;
       }
@@ -755,28 +802,26 @@
 
     fillFromUrlBtn.addEventListener("click", fillFromUrl);
 
-    productUrlInput.addEventListener("paste", function() {
-      setTimeout(function() {
-        const url = productUrlInput.value.trim();
-        if (url) {
-          setUrlStatus("URL pasted. Click “Fill from URL” to try loading the name and image.");
-        }
-      }, 0);
-    });
-
     checkBtn.addEventListener("click", function() {
       const input = ingredientsInput.value.trim();
 
       if (!input) {
         results.className = "results neutral";
         results.innerHTML = "<p>Please paste an ingredient list first.</p>";
+        saveRow.className = "save-row";
+        lastCheckedMatches = null;
         return;
       }
 
       const ingredients = parseIngredients(input);
       const matches = checkIngredients(ingredients);
+      lastCheckedMatches = matches;
       renderResults(matches);
-      saveCurrentResult(matches);
+      saveRow.className = "save-row show";
+    });
+
+    saveBtn.addEventListener("click", function() {
+      saveCurrentResult();
     });
 
     clearBtn.addEventListener("click", function() {
@@ -787,9 +832,9 @@
       results.className = "results";
       results.innerHTML = "";
       setUrlStatus("");
-      previewWrap.className = "preview-wrap";
-      previewImage.removeAttribute("src");
-      previewText.textContent = "";
+      clearPreview();
+      saveRow.className = "save-row";
+      lastCheckedMatches = null;
     });
 
     clearHistoryBtn.addEventListener("click", function() {
