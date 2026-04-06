@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Acne Ingredient Checker</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f7f7fb;
+      color: #222;
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 40px auto;
+      padding: 24px;
+      background: white;
+      border-radius: 16px;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
+    }
+
+    h1 {
+      margin-top: 0;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      margin-top: 0;
+      margin-bottom: 20px;
+      color: #555;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 8px;
+    }
+
+    textarea {
+      width: 100%;
+      padding: 14px;
+      border: 1px solid #ccc;
+      border-radius: 12px;
+      font-size: 16px;
+      resize: vertical;
+    }
+
+    .button-row {
+      display: flex;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      padding: 12px 18px;
+      font-size: 15px;
+      cursor: pointer;
+      background: #2563eb;
+      color: white;
+    }
+
+    button.secondary {
+      background: #6b7280;
+    }
+
+    .results {
+      margin-top: 24px;
+      padding: 18px;
+      border-radius: 12px;
+      background: #f3f4f6;
+      display: none;
+    }
+
+    .results.good {
+      display: block;
+      background: #ecfdf5;
+      border: 1px solid #10b981;
+    }
+
+    .results.bad {
+      display: block;
+      background: #fef2f2;
+      border: 1px solid #ef4444;
+    }
+
+    .results.neutral {
+      display: block;
+      background: #f3f4f6;
+      border: 1px solid #d1d5db;
+    }
+
+    .results h2 {
+      margin-top: 0;
+    }
+
+    .results ul {
+      padding-left: 20px;
+    }
+
+    .note {
+      margin-top: 12px;
+      font-size: 14px;
+      color: #444;
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <h1>Acne Ingredient Checker</h1>
+    <p class="subtitle">
+      Paste a skincare, makeup, or cosmetic ingredient list to check for potentially pore-clogging ingredients.
+    </p>
+
+    <label for="ingredientsInput">Ingredients</label>
+    <textarea
+      id="ingredientsInput"
+      rows="12"
+      placeholder="Paste ingredients here..."
+    ></textarea>
+
+    <div class="button-row">
+      <button id="checkBtn" type="button">Check Ingredients</button>
+      <button id="clearBtn" type="button" class="secondary">Clear</button>
+    </div>
+
+    <section id="results" class="results"></section>
+  </main>
+
+  <script>
+    const CLOGGERS = [
+      "Acetylated Lanolin",
+      "Lauroyl Lysine",
+      "Acetylated Lanolin Alcohol",
+      "Linseed Oil",
+      "Algae",
+      "Algae extract",
+      "Algin",
+      "Argan oil",
+      "Butyl Stearate",
+      "Carrageenan",
+      "Cetearyl alcohol",
+      "Ceteareth 20",
+      "Cetyl Acetate",
+      "Chlorella",
+      "Chondrus Crispus",
+      "Irish Moss",
+      "Coal Tar",
+      "Cocoa Butter",
+      "Coconut Alkanes",
+      "Coconut Butter",
+      "Coconut Oil",
+      "Coco Nucifera",
+      "Cotton Seed Oil",
+      "D&C RED",
+      "Decyl Oleate",
+      "Dioctyl Malate",
+      "Dioctyl Succinate",
+      "Disodium Monooleamido",
+      "Ethoxylated Lanolin",
+      "Ethylhexyl Palmitate",
+      "Glyceryl Stearate SE",
+      "Glyceryl-3 Diisostearate",
+      "Hexadecyl Alcohol",
+      "Hydrogenated Vegetable Oil",
+      "Isocetyl Alcohol",
+      "Isocetyl Stearate",
+      "Isodecyl Oleate",
+      "Isopropyl Isostearate",
+      "Isopropyl Linolate",
+      "Isopropyl Myristate",
+      "Isopropyl Palmitate",
+      "Isostearic Acid",
+      "Isostearyl Isostearate",
+      "Isostearyl Neopentanoate",
+      "Kelp",
+      "Laminaria Digitata Extract",
+      "Laminaria Saccharina",
+      "Lauric Acid",
+      "Laureth-23",
+      "Laureth-4",
+      "Marula Oil",
+      "Mink Oil",
+      "Moringa Oil",
+      "Myristic Acid",
+      "Myristyl Lactate",
+      "Myristyl Myristate",
+      "Octyl Palmitate",
+      "Octyl Stearate",
+      "Oleic Acid",
+      "Oleth-3",
+      "Oleth-5",
+      "Oleyl Alcohol",
+      "Palm Oil",
+      "PEG 16 Lanolin",
+      "PEG 2 Sulfusuccinate",
+      "PEG 200 Dilaurate",
+      "PEG 8 Stearate",
+      "PG Monostearate",
+      "Plankton",
+      "Polyglyceryl-3 Diisostearate",
+      "Potassium Chloride",
+      "PPG 10 Cetyl Ether",
+      "PPG 2 Myristyl Propionate",
+      "PPG 5 Ceteth 10 Phosphate",
+      "Propylene Glycol Monostearate",
+      "Red Algae",
+      "Sea Whip Extract",
+      "Seaweed",
+      "Shark Liver Oil",
+      "Shea Butter",
+      "Sodium Alginate",
+      "Sodium Chloride",
+      "Sodium Laureth Sulfate",
+      "Sodium Lauryl Sulfate",
+      "Solulan 16",
+      "Sorbitan Oleate",
+      "Soybean Oil",
+      "Glycine Soja Oil",
+      "Spirulina",
+      "Squalene",
+      "Steareth 10",
+      "Stearic Acid TEA",
+      "Stearyl Heptanoate",
+      "Tocopherol",
+      "Wheat Germ Oil",
+      "Xylene"
+    ];
+
+    const SYNONYM_GROUPS = [
+      ["Laminaria Saccharina", "Seaweed"],
+      ["Spirulina", "Seaweed"],
+      ["Kelp", "Seaweed"]
+    ];
+
+    const DC_RED_NOTE =
+      "Check number. D&C RED #3, #17, #21, #30, and #36 are commonly flagged.";
+
+    const ingredientsInput = document.getElementById("ingredientsInput");
+    const checkBtn = document.getElementById("checkBtn");
+    const clearBtn = document.getElementById("clearBtn");
+    const results = document.getElementById("results");
+
+    function normalizeText(text) {
+      return text
+        .toLowerCase()
+        .replace(/\s+/g, " ")
+        .replace(/[()]/g, "")
+        .trim();
+    }
+
+    function parseIngredients(input) {
+      return input
+        .split(",")
+        .map(function(item) {
+          return item.trim();
+        })
+        .filter(function(item) {
+          return item.length > 0;
+        });
+    }
+
+    function removeDuplicateMatches(matches) {
+      const seen = new Set();
+
+      return matches.filter(function(match) {
+        const key =
+          normalizeText(match.ingredient) + "|" + normalizeText(match.matchedClogger);
+
+        if (seen.has(key)) {
+          return false;
+        }
+
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function removeSynonymRedundancy(matches) {
+      const normalizedGroups = SYNONYM_GROUPS.map(function(group) {
+        return group.map(function(item) {
+          return normalizeText(item);
+        });
+      });
+
+      return matches.filter(function(match, index, arr) {
+        const matchNorm = normalizeText(match.matchedClogger);
+
+        for (let g = 0; g < normalizedGroups.length; g++) {
+          const group = normalizedGroups[g];
+
+          if (group.includes(matchNorm)) {
+            const firstInGroup = arr.find(function(m) {
+              return group.includes(normalizeText(m.matchedClogger));
+            });
+            return firstInGroup === match;
+          }
+        }
+
+        return true;
+      });
+    }
+
+    function checkIngredients(productIngredients) {
+      const matches = [];
+
+      for (let i = 0; i < productIngredients.length; i++) {
+        const ingredient = productIngredients[i];
+        const normalizedIngredient = normalizeText(ingredient);
+
+        for (let j = 0; j < CLOGGERS.length; j++) {
+          const clogger = CLOGGERS[j];
+          const normalizedClogger = normalizeText(clogger);
+
+          if (normalizedIngredient.includes(normalizedClogger)) {
+            matches.push({
+              ingredient: ingredient,
+              matchedClogger: clogger
+            });
+          }
+        }
+      }
+
+      return removeSynonymRedundancy(removeDuplicateMatches(matches));
+    }
+
+    function escapeHtml(str) {
+      const div = document.createElement("div");
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    function renderResults(matches) {
+      results.className = "results";
+
+      if (matches.length === 0) {
+        results.classList.add("good");
+        results.innerHTML =
+          "<h2>No comedogenic ingredients found</h2>" +
+          "<p>This does not guarantee the product is acne-safe, but none of the listed ingredients matched your flagged list.</p>";
+        return;
+      }
+
+      const hasDCRed = matches.some(function(match) {
+        return normalizeText(match.matchedClogger) === normalizeText("D&C RED");
+      });
+
+      const listItems = matches
+        .map(function(match) {
+          return (
+            "<li><strong>" +
+            escapeHtml(match.ingredient) +
+            "</strong> <em>(matched: " +
+            escapeHtml(match.matchedClogger) +
+            ")</em></li>"
+          );
+        })
+        .join("");
+
+      let html =
+        "<h2>Potentially pore-clogging ingredients found</h2>" +
+        "<ul>" + listItems + "</ul>" +
+        '<p class="note">Shown as: product ingredient (matched comedogenic ingredient)</p>';
+
+      if (hasDCRed) {
+        html += '<p class="note">' + escapeHtml(DC_RED_NOTE) + "</p>";
+      }
+
+      results.classList.add("bad");
+      results.innerHTML = html;
+    }
+
+    checkBtn.addEventListener("click", function() {
+      const input = ingredientsInput.value.trim();
+
+      if (!input) {
+        results.className = "results neutral";
+        results.innerHTML = "<p>Please paste an ingredient list first.</p>";
+        return;
+      }
+
+      const ingredients = parseIngredients(input);
+      const matches = checkIngredients(ingredients);
+      renderResults(matches);
+    });
+
+    clearBtn.addEventListener("click", function() {
+      ingredientsInput.value = "";
+      results.className = "results";
+      results.innerHTML = "";
+    });
+  </script>
+</body>
+</html>
