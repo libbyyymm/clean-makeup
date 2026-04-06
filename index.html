@@ -17,7 +17,7 @@
     }
 
     .container {
-      max-width: 800px;
+      max-width: 900px;
       margin: 40px auto;
       padding: 24px;
       background: white;
@@ -25,34 +25,36 @@
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.08);
     }
 
-    h1 {
+    h1, h2, h3 {
       margin-top: 0;
-      margin-bottom: 8px;
     }
 
     .subtitle {
-      margin-top: 0;
-      margin-bottom: 20px;
       color: #555;
+      margin-bottom: 20px;
     }
 
     label {
       display: block;
       font-weight: 600;
-      margin-bottom: 8px;
+      margin: 14px 0 8px;
     }
 
-    textarea {
+    input, textarea {
       width: 100%;
-      padding: 14px;
+      padding: 12px;
       border: 1px solid #ccc;
       border-radius: 12px;
       font-size: 16px;
+    }
+
+    textarea {
       resize: vertical;
     }
 
     .button-row {
       display: flex;
+      flex-wrap: wrap;
       gap: 12px;
       margin-top: 16px;
     }
@@ -71,11 +73,14 @@
       background: #6b7280;
     }
 
+    button.danger {
+      background: #dc2626;
+    }
+
     .results {
       margin-top: 24px;
       padding: 18px;
       border-radius: 12px;
-      background: #f3f4f6;
       display: none;
     }
 
@@ -97,10 +102,6 @@
       border: 1px solid #d1d5db;
     }
 
-    .results h2 {
-      margin-top: 0;
-    }
-
     .results ul {
       padding-left: 20px;
     }
@@ -109,6 +110,112 @@
       margin-top: 12px;
       font-size: 14px;
       color: #444;
+    }
+
+    .history {
+      margin-top: 36px;
+    }
+
+    .history-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .history-list {
+      display: grid;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .history-card {
+      border: 1px solid #ddd;
+      border-radius: 14px;
+      padding: 16px;
+      background: #fafafa;
+    }
+
+    .history-top {
+      display: flex;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .history-image {
+      width: 110px;
+      height: 110px;
+      object-fit: cover;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      background: #eee;
+      flex-shrink: 0;
+    }
+
+    .history-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .history-meta h3 {
+      margin: 0 0 8px;
+      font-size: 20px;
+    }
+
+    .history-meta a {
+      color: #2563eb;
+      word-break: break-all;
+    }
+
+    .status {
+      display: inline-block;
+      margin: 8px 0;
+      padding: 6px 10px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .status.good {
+      background: #d1fae5;
+      color: #065f46;
+    }
+
+    .status.bad {
+      background: #fee2e2;
+      color: #991b1b;
+    }
+
+    .small {
+      font-size: 14px;
+      color: #555;
+    }
+
+    .empty-history {
+      margin-top: 12px;
+      color: #666;
+    }
+
+    .history-matches {
+      margin-top: 10px;
+    }
+
+    .history-actions {
+      margin-top: 14px;
+    }
+
+    @media (max-width: 640px) {
+      .history-top {
+        flex-direction: column;
+      }
+
+      .history-image {
+        width: 100%;
+        max-width: 220px;
+        height: auto;
+        aspect-ratio: 1 / 1;
+      }
     }
   </style>
 </head>
@@ -119,19 +226,37 @@
       Paste a skincare, makeup, or cosmetic ingredient list to check for potentially pore-clogging ingredients.
     </p>
 
+    <label for="productNameInput">Product Name</label>
+    <input id="productNameInput" type="text" placeholder="Example: Hydrating Cleanser" />
+
+    <label for="productUrlInput">Product URL</label>
+    <input id="productUrlInput" type="url" placeholder="https://example.com/product-page" />
+
+    <label for="imageUrlInput">Product Image URL</label>
+    <input id="imageUrlInput" type="url" placeholder="https://example.com/product-image.jpg" />
+
     <label for="ingredientsInput">Ingredients</label>
     <textarea
       id="ingredientsInput"
-      rows="12"
+      rows="10"
       placeholder="Paste ingredients here..."
     ></textarea>
 
     <div class="button-row">
       <button id="checkBtn" type="button">Check Ingredients</button>
-      <button id="clearBtn" type="button" class="secondary">Clear</button>
+      <button id="clearBtn" type="button" class="secondary">Clear Form</button>
     </div>
 
     <section id="results" class="results"></section>
+
+    <section class="history">
+      <div class="history-header">
+        <h2>Saved History</h2>
+        <button id="clearHistoryBtn" type="button" class="danger">Clear History</button>
+      </div>
+      <div id="historyList" class="history-list"></div>
+      <p id="emptyHistory" class="empty-history">No saved results yet.</p>
+    </section>
   </main>
 
   <script>
@@ -243,10 +368,18 @@
     const DC_RED_NOTE =
       "Check number. D&C RED #3, #17, #21, #30, and #36 are commonly flagged.";
 
+    const STORAGE_KEY = "acneCheckerHistory";
+
+    const productNameInput = document.getElementById("productNameInput");
+    const productUrlInput = document.getElementById("productUrlInput");
+    const imageUrlInput = document.getElementById("imageUrlInput");
     const ingredientsInput = document.getElementById("ingredientsInput");
     const checkBtn = document.getElementById("checkBtn");
     const clearBtn = document.getElementById("clearBtn");
+    const clearHistoryBtn = document.getElementById("clearHistoryBtn");
     const results = document.getElementById("results");
+    const historyList = document.getElementById("historyList");
+    const emptyHistory = document.getElementById("emptyHistory");
 
     function normalizeText(text) {
       return text
@@ -274,10 +407,7 @@
         const key =
           normalizeText(match.ingredient) + "|" + normalizeText(match.matchedClogger);
 
-        if (seen.has(key)) {
-          return false;
-        }
-
+        if (seen.has(key)) return false;
         seen.add(key);
         return true;
       });
@@ -333,8 +463,26 @@
 
     function escapeHtml(str) {
       const div = document.createElement("div");
-      div.textContent = str;
+      div.textContent = str == null ? "" : str;
       return div.innerHTML;
+    }
+
+    function getHistory() {
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) {
+        return [];
+      }
+    }
+
+    function saveHistory(items) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+
+    function formatDate(dateString) {
+      const d = new Date(dateString);
+      return d.toLocaleString();
     }
 
     function renderResults(matches) {
@@ -352,17 +500,15 @@
         return normalizeText(match.matchedClogger) === normalizeText("D&C RED");
       });
 
-      const listItems = matches
-        .map(function(match) {
-          return (
-            "<li><strong>" +
-            escapeHtml(match.ingredient) +
-            "</strong> <em>(matched: " +
-            escapeHtml(match.matchedClogger) +
-            ")</em></li>"
-          );
-        })
-        .join("");
+      const listItems = matches.map(function(match) {
+        return (
+          "<li><strong>" +
+          escapeHtml(match.ingredient) +
+          "</strong> <em>(matched: " +
+          escapeHtml(match.matchedClogger) +
+          ")</em></li>"
+        );
+      }).join("");
 
       let html =
         "<h2>Potentially pore-clogging ingredients found</h2>" +
@@ -377,6 +523,92 @@
       results.innerHTML = html;
     }
 
+    function renderHistory() {
+      const items = getHistory();
+      historyList.innerHTML = "";
+
+      if (items.length === 0) {
+        emptyHistory.style.display = "block";
+        return;
+      }
+
+      emptyHistory.style.display = "none";
+
+      items.forEach(function(item, index) {
+        const card = document.createElement("div");
+        card.className = "history-card";
+
+        const imageHtml = item.imageUrl
+          ? '<img class="history-image" src="' + escapeHtml(item.imageUrl) + '" alt="' + escapeHtml(item.productName || "Product image") + '" onerror="this.style.display=\'none\'" />'
+          : '<div class="history-image"></div>';
+
+        const urlHtml = item.productUrl
+          ? '<p><a href="' + escapeHtml(item.productUrl) + '" target="_blank" rel="noopener noreferrer">' + escapeHtml(item.productUrl) + "</a></p>"
+          : "<p class='small'>No product URL saved.</p>";
+
+        const statusClass = item.matches.length === 0 ? "good" : "bad";
+        const statusText = item.matches.length === 0
+          ? "No flagged ingredients found"
+          : "Potentially pore-clogging ingredients found";
+
+        const matchesHtml = item.matches.length === 0
+          ? "<p class='small'>No matched ingredients saved.</p>"
+          : "<ul class='history-matches'>" +
+              item.matches.map(function(match) {
+                return "<li><strong>" +
+                  escapeHtml(match.ingredient) +
+                  "</strong> <em>(matched: " +
+                  escapeHtml(match.matchedClogger) +
+                  ")</em></li>";
+              }).join("") +
+            "</ul>";
+
+        card.innerHTML =
+          '<div class="history-top">' +
+            imageHtml +
+            '<div class="history-meta">' +
+              "<h3>" + escapeHtml(item.productName || "Unnamed Product") + "</h3>" +
+              urlHtml +
+              '<div class="status ' + statusClass + '">' + escapeHtml(statusText) + "</div>" +
+              '<p class="small">Saved: ' + escapeHtml(formatDate(item.checkedAt)) + "</p>" +
+              matchesHtml +
+              '<div class="history-actions">' +
+                '<button type="button" class="danger" data-index="' + index + '">Delete</button>' +
+              "</div>" +
+            "</div>" +
+          "</div>";
+
+        historyList.appendChild(card);
+      });
+
+      const deleteButtons = historyList.querySelectorAll("button[data-index]");
+      deleteButtons.forEach(function(btn) {
+        btn.addEventListener("click", function() {
+          const items = getHistory();
+          const index = Number(btn.getAttribute("data-index"));
+          items.splice(index, 1);
+          saveHistory(items);
+          renderHistory();
+        });
+      });
+    }
+
+    function saveCurrentResult(matches) {
+      const items = getHistory();
+
+      items.unshift({
+        productName: productNameInput.value.trim(),
+        productUrl: productUrlInput.value.trim(),
+        imageUrl: imageUrlInput.value.trim(),
+        ingredientsText: ingredientsInput.value.trim(),
+        matches: matches,
+        checkedAt: new Date().toISOString()
+      });
+
+      saveHistory(items);
+      renderHistory();
+    }
+
     checkBtn.addEventListener("click", function() {
       const input = ingredientsInput.value.trim();
 
@@ -389,13 +621,25 @@
       const ingredients = parseIngredients(input);
       const matches = checkIngredients(ingredients);
       renderResults(matches);
+      saveCurrentResult(matches);
     });
 
     clearBtn.addEventListener("click", function() {
+      productNameInput.value = "";
+      productUrlInput.value = "";
+      imageUrlInput.value = "";
       ingredientsInput.value = "";
       results.className = "results";
       results.innerHTML = "";
     });
+
+    clearHistoryBtn.addEventListener("click", function() {
+      if (!confirm("Clear all saved history?")) return;
+      localStorage.removeItem(STORAGE_KEY);
+      renderHistory();
+    });
+
+    renderHistory();
   </script>
 </body>
 </html>
