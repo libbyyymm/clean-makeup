@@ -52,6 +52,17 @@
       resize: vertical;
     }
 
+    .url-row {
+      display: flex;
+      gap: 12px;
+      align-items: end;
+      flex-wrap: wrap;
+    }
+
+    .url-row .field {
+      flex: 1 1 420px;
+    }
+
     .button-row {
       display: flex;
       flex-wrap: wrap;
@@ -75,6 +86,18 @@
 
     button.danger {
       background: #dc2626;
+    }
+
+    button:disabled {
+      opacity: 0.7;
+      cursor: wait;
+    }
+
+    .status-message {
+      margin-top: 10px;
+      font-size: 14px;
+      color: #444;
+      min-height: 20px;
     }
 
     .results {
@@ -143,7 +166,8 @@
       align-items: flex-start;
     }
 
-    .history-image {
+    .history-image,
+    .preview-image {
       width: 110px;
       height: 110px;
       object-fit: cover;
@@ -151,6 +175,22 @@
       border: 1px solid #ddd;
       background: #eee;
       flex-shrink: 0;
+    }
+
+    .preview-wrap {
+      margin-top: 12px;
+      display: none;
+      gap: 12px;
+      align-items: center;
+    }
+
+    .preview-wrap.show {
+      display: flex;
+    }
+
+    .preview-meta {
+      font-size: 14px;
+      color: #555;
     }
 
     .history-meta {
@@ -206,11 +246,14 @@
     }
 
     @media (max-width: 640px) {
-      .history-top {
+      .history-top,
+      .preview-wrap.show {
         flex-direction: column;
+        align-items: flex-start;
       }
 
-      .history-image {
+      .history-image,
+      .preview-image {
         width: 100%;
         max-width: 220px;
         height: auto;
@@ -229,8 +272,26 @@
     <label for="productNameInput">Product Name</label>
     <input id="productNameInput" type="text" placeholder="Example: Hydrating Cleanser" />
 
-    <label for="productUrlInput">Product URL</label>
-    <input id="productUrlInput" type="url" placeholder="https://example.com/product-page" />
+    <div class="url-row">
+      <div class="field">
+        <label for="productUrlInput">Product URL</label>
+        <input id="productUrlInput" type="url" placeholder="https://example.com/product-page" />
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button id="fillFromUrlBtn" type="button">Fill from URL</button>
+      </div>
+    </div>
+
+    <div id="urlStatus" class="status-message"></div>
+
+    <div id="previewWrap" class="preview-wrap">
+      <img id="previewImage" class="preview-image" alt="Product preview" />
+      <div class="preview-meta">
+        <div><strong>Preview loaded from URL</strong></div>
+        <div id="previewText"></div>
+      </div>
+    </div>
 
     <label for="imageUrlInput">Product Image URL</label>
     <input id="imageUrlInput" type="url" placeholder="https://example.com/product-image.jpg" />
@@ -374,12 +435,17 @@
     const productUrlInput = document.getElementById("productUrlInput");
     const imageUrlInput = document.getElementById("imageUrlInput");
     const ingredientsInput = document.getElementById("ingredientsInput");
+    const fillFromUrlBtn = document.getElementById("fillFromUrlBtn");
     const checkBtn = document.getElementById("checkBtn");
     const clearBtn = document.getElementById("clearBtn");
     const clearHistoryBtn = document.getElementById("clearHistoryBtn");
     const results = document.getElementById("results");
     const historyList = document.getElementById("historyList");
     const emptyHistory = document.getElementById("emptyHistory");
+    const urlStatus = document.getElementById("urlStatus");
+    const previewWrap = document.getElementById("previewWrap");
+    const previewImage = document.getElementById("previewImage");
+    const previewText = document.getElementById("previewText");
 
     function normalizeText(text) {
       return text
@@ -609,6 +675,95 @@
       renderHistory();
     }
 
+    function setUrlStatus(message) {
+      urlStatus.textContent = message || "";
+    }
+
+    function showPreview(title, imageUrl) {
+      if (!imageUrl) {
+        previewWrap.className = "preview-wrap";
+        previewImage.removeAttribute("src");
+        previewText.textContent = "";
+        return;
+      }
+
+      previewImage.src = imageUrl;
+      previewText.textContent = title ? title : "Preview image loaded";
+      previewWrap.className = "preview-wrap show";
+    }
+
+    async function fillFromUrl() {
+      const url = productUrlInput.value.trim();
+
+      if (!url) {
+        setUrlStatus("Paste a product URL first.");
+        return;
+      }
+
+      fillFromUrlBtn.disabled = true;
+      setUrlStatus("Trying to load product info from URL...");
+
+      try {
+        const endpoint = "https://api.microlink.io/?url=" + encodeURIComponent(url);
+        const response = await fetch(endpoint);
+
+        if (!response.ok) {
+          throw new Error("Metadata request failed.");
+        }
+
+        const data = await response.json();
+
+        if (!data || !data.data) {
+          throw new Error("No metadata returned.");
+        }
+
+        const meta = data.data;
+
+        const detectedTitle = meta.title || "";
+        const detectedImage =
+          (meta.image && meta.image.url) ||
+          (meta.logo && meta.logo.url) ||
+          "";
+
+        let filledAnything = false;
+
+        if (detectedTitle && !productNameInput.value.trim()) {
+          productNameInput.value = detectedTitle;
+          filledAnything = true;
+        }
+
+        if (detectedImage && !imageUrlInput.value.trim()) {
+          imageUrlInput.value = detectedImage;
+          filledAnything = true;
+        }
+
+        showPreview(detectedTitle, detectedImage);
+
+        if (filledAnything) {
+          setUrlStatus("Loaded product info from the URL.");
+        } else if (detectedTitle || detectedImage) {
+          setUrlStatus("Metadata found. Existing fields were left unchanged.");
+        } else {
+          setUrlStatus("Could not find a title or image for that URL.");
+        }
+      } catch (error) {
+        setUrlStatus("Could not load product info from that URL. You can still fill it in manually.");
+      } finally {
+        fillFromUrlBtn.disabled = false;
+      }
+    }
+
+    fillFromUrlBtn.addEventListener("click", fillFromUrl);
+
+    productUrlInput.addEventListener("paste", function() {
+      setTimeout(function() {
+        const url = productUrlInput.value.trim();
+        if (url) {
+          setUrlStatus("URL pasted. Click “Fill from URL” to try loading the name and image.");
+        }
+      }, 0);
+    });
+
     checkBtn.addEventListener("click", function() {
       const input = ingredientsInput.value.trim();
 
@@ -631,6 +786,10 @@
       ingredientsInput.value = "";
       results.className = "results";
       results.innerHTML = "";
+      setUrlStatus("");
+      previewWrap.className = "preview-wrap";
+      previewImage.removeAttribute("src");
+      previewText.textContent = "";
     });
 
     clearHistoryBtn.addEventListener("click", function() {
